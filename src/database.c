@@ -178,14 +178,34 @@ int db__close(struct mosquitto_db *db)
 }
 
 
-void db__msg_store_add(struct mosquitto_db *db, struct mosquitto_msg_store *store)
+void db__msg_store_add(struct mosquitto_db *db, struct mosquitto_msg_store *store, int is_critical_publish)
 {
-	store->next = db->msg_store;
-	store->prev = NULL;
-	if(db->msg_store){
-		db->msg_store->prev = store;
-	}
-	db->msg_store = store;
+	// if(is_critical_publish){
+		// PREPEND
+		store->next = db->msg_store;
+		store->prev = NULL;
+		if(db->msg_store){
+			db->msg_store->prev = store;
+		}
+		db->msg_store = store;
+	// }else{
+	// 	// APPEND
+	// 	if (db->msg_store)
+	// 	{
+	// 		(store)->prev = (db->msg_store)->prev;
+	// 		if(db->msg_store->prev) {
+	// 			(db->msg_store)->prev->next = (store);
+	// 		}
+	// 		(db->msg_store)->prev = (store);
+	// 		(store)->next = NULL;
+	// 	}
+	// 	else
+	// 	{
+	// 		(db->msg_store) = (store);
+	// 		(db->msg_store)->prev = (db->msg_store);
+	// 		(db->msg_store)->next = NULL;
+	// 	}
+	// }
 }
 
 
@@ -292,7 +312,20 @@ void db__message_dequeue_first(struct mosquitto *context, struct mosquitto_msg_d
 
 	msg = msg_data->queued;
 	DL_DELETE(msg_data->queued, msg);
-	DL_APPEND(msg_data->inflight, msg);
+
+	// int is_critical_publish = 0;
+	// if(msg->store->payloadlen >= 2){
+	// 	is_critical_publish =
+	// 		((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[0] == '!' &&
+	// 		((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[1] == '!';
+	// }
+
+	// if(is_critical_publish){
+	// 	DL_PREPEND(msg_data->inflight, msg);
+	// }else{
+		DL_APPEND(msg_data->inflight, msg);
+	// }
+
 	if(msg_data->inflight_quota > 0){
 		msg_data->inflight_quota--;
 	}
@@ -360,6 +393,13 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 		msg_data = &context->msgs_out;
 	}else{
 		msg_data = &context->msgs_in;
+	}
+
+	int is_critical_publish = 0;
+	if(stored->payloadlen >= 2){
+		is_critical_publish =
+			((char *) UHPA_ACCESS(stored->payload, stored->payloadlen))[0] == '!' &&
+			((char *) UHPA_ACCESS(stored->payload, stored->payloadlen))[1] == '!';
 	}
 
 	/* Check whether we've already sent this message to this client
@@ -476,9 +516,19 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 	msg->properties = properties;
 
 	if(state == mosq_ms_queued){
-		DL_APPEND(msg_data->queued, msg);
+		if (is_critical_publish){
+			// DL_PREPEND(msg_data->queued, msg);
+			DL_APPEND(msg_data->queued, msg);
+		}else{
+			DL_APPEND(msg_data->queued, msg);
+		}
 	}else{
-		DL_APPEND(msg_data->inflight, msg);
+		if (is_critical_publish){
+			// DL_PREPEND(msg_data->inflight, msg);
+			DL_APPEND(msg_data->inflight, msg);
+		}else{
+			DL_APPEND(msg_data->inflight, msg);
+		}
 	}
 	msg_data->msg_count++;
 	msg_data->msg_bytes+= msg->store->payloadlen;
@@ -634,6 +684,8 @@ int db__messages_easy_queue(struct mosquitto_db *db, struct mosquitto *context, 
 /* This function requires topic to be allocated on the heap. Once called, it owns topic and will free it on error. Likewise payload and properties. */
 int db__message_store(struct mosquitto_db *db, const struct mosquitto *source, uint16_t source_mid, char *topic, int qos, uint32_t payloadlen, mosquitto__payload_uhpa *payload, int retain, struct mosquitto_msg_store **stored, uint32_t message_expiry_interval, mosquitto_property *properties, dbid_t store_id, enum mosquitto_msg_origin origin)
 {
+	int is_critical_publish = 0;
+
 	struct mosquitto_msg_store *temp = NULL;
 	int rc = MOSQ_ERR_SUCCESS;
 
@@ -681,8 +733,15 @@ int db__message_store(struct mosquitto_db *db, const struct mosquitto *source, u
 	temp->payloadlen = payloadlen;
 	temp->properties = properties;
 	temp->origin = origin;
+
 	if(payloadlen){
 		UHPA_MOVE(temp->payload, *payload, payloadlen);
+
+		if (temp->payloadlen >= 2) {
+			is_critical_publish =
+				((char *)UHPA_ACCESS(temp->payload, temp->payloadlen))[0] == '!' &&
+				((char *)UHPA_ACCESS(temp->payload, temp->payloadlen))[1] == '!';
+		}
 	}else{
 		temp->payload.ptr = NULL;
 	}
@@ -704,7 +763,7 @@ int db__message_store(struct mosquitto_db *db, const struct mosquitto *source, u
 		temp->db_id = store_id;
 	}
 
-	db__msg_store_add(db, temp);
+	db__msg_store_add(db, temp, is_critical_publish);
 
 	return MOSQ_ERR_SUCCESS;
 error:

@@ -295,6 +295,11 @@ int handle__publish(struct mosquitto_db *db, struct mosquitto *context)
 	}
 
 	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, qos, retain, mid, topic, (long)payloadlen);
+	int print_len = payloadlen;
+	if (((char *)UHPA_ACCESS(payload, payloadlen))[payloadlen - 1] == '\n')
+		print_len = payloadlen - 1;
+	log__printf(NULL, MOSQ_LOG_PAYLOAD, "> payload: '%.*s'", print_len, (char *)UHPA_ACCESS(payload, payloadlen));
+
 	if(qos > 0){
 		db__message_store_find(context, mid, &stored);
 	}
@@ -363,4 +368,3 @@ process_bad_message:
 	}
 	return 1;
 }
-

@@ -1541,6 +1541,8 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 						}else if(!strcmp(token, "websockets")){
 							cr->log_type |= MOSQ_LOG_WEBSOCKETS;
 #endif
+						}else if(!strcmp(token, "payload")){
+							cr->log_type |= MOSQ_LOG_PAYLOAD;					
 						}else if(!strcmp(token, "all")){
 							cr->log_type = MOSQ_LOG_ALL;
 						}else{
@@ -2129,6 +2131,28 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 #else
 					log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge support not available.");
 #endif
+				}else if(!strcmp(token, "topic_priority")){
+					token = strtok_r(NULL, " ", &saveptr);
+					if(token){
+						config->priority_topic_count++;
+						
+						char** priority_topics = mosquitto__realloc(config->priority_topics, sizeof(char*)*config->priority_topic_count);
+
+						if(!priority_topics){
+							log__printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
+							return MOSQ_ERR_NOMEM;
+						}
+						config->priority_topics = priority_topics;
+						config->priority_topics[config->priority_topic_count-1] = mosquitto__strdup(token);
+
+						if(!config->priority_topics[config->priority_topic_count-1]){
+							log__printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
+							return MOSQ_ERR_NOMEM;
+						}
+					}else{
+						log__printf(NULL, MOSQ_LOG_ERR, "Error: Empty topic value in configuration.");
+						return MOSQ_ERR_INVAL;
+					}
 				}else if(!strcmp(token, "max_topic_alias")){
 					if(reload) continue; /* Listeners not valid for reloading. */
 					token = strtok_r(NULL, " ", &saveptr);

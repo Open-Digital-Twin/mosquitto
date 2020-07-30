@@ -180,7 +180,7 @@ int db__close(struct mosquitto_db *db)
 
 void db__msg_store_add(struct mosquitto_db *db, struct mosquitto_msg_store *store, int is_critical_publish)
 {
-	// if(is_critical_publish){
+	if(is_critical_publish){
 		// PREPEND
 		store->next = db->msg_store;
 		store->prev = NULL;
@@ -188,24 +188,24 @@ void db__msg_store_add(struct mosquitto_db *db, struct mosquitto_msg_store *stor
 			db->msg_store->prev = store;
 		}
 		db->msg_store = store;
-	// }else{
-	// 	// APPEND
-	// 	if (db->msg_store)
-	// 	{
-	// 		(store)->prev = (db->msg_store)->prev;
-	// 		if(db->msg_store->prev) {
-	// 			(db->msg_store)->prev->next = (store);
-	// 		}
-	// 		(db->msg_store)->prev = (store);
-	// 		(store)->next = NULL;
-	// 	}
-	// 	else
-	// 	{
-	// 		(db->msg_store) = (store);
-	// 		(db->msg_store)->prev = (db->msg_store);
-	// 		(db->msg_store)->next = NULL;
-	// 	}
-	// }
+	}else{
+		// APPEND
+		if (db->msg_store)
+		{
+			(store)->prev = (db->msg_store)->prev;
+			if(db->msg_store->prev) {
+				(db->msg_store)->prev->next = (store);
+			}
+			(db->msg_store)->prev = (store);
+			(store)->next = NULL;
+		}
+		else
+		{
+			(db->msg_store) = (store);
+			(db->msg_store)->prev = (db->msg_store);
+			(db->msg_store)->next = NULL;
+		}
+	}
 }
 
 
@@ -313,18 +313,18 @@ void db__message_dequeue_first(struct mosquitto *context, struct mosquitto_msg_d
 	msg = msg_data->queued;
 	DL_DELETE(msg_data->queued, msg);
 
-	// int is_critical_publish = 0;
-	// if(msg->store->payloadlen >= 2){
-	// 	is_critical_publish =
-	// 		((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[0] == '!' &&
-	// 		((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[1] == '!';
-	// }
+	int is_critical_publish = 0;
+	if(msg->store->payloadlen >= 2){
+		is_critical_publish =
+			((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[0] == '!' &&
+			((char *) UHPA_ACCESS(msg->store->payload, msg->store->payloadlen))[1] == '!';
+	}
 
-	// if(is_critical_publish){
-	// 	DL_PREPEND(msg_data->inflight, msg);
-	// }else{
+	if(is_critical_publish){
+		DL_PREPEND(msg_data->inflight, msg);
+	}else{
 		DL_APPEND(msg_data->inflight, msg);
-	// }
+	}
 
 	if(msg_data->inflight_quota > 0){
 		msg_data->inflight_quota--;
@@ -517,15 +517,13 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 
 	if(state == mosq_ms_queued){
 		if (is_critical_publish){
-			// DL_PREPEND(msg_data->queued, msg);
-			DL_APPEND(msg_data->queued, msg);
+			DL_PREPEND(msg_data->queued, msg);
 		}else{
 			DL_APPEND(msg_data->queued, msg);
 		}
 	}else{
 		if (is_critical_publish){
-			// DL_PREPEND(msg_data->inflight, msg);
-			DL_APPEND(msg_data->inflight, msg);
+			DL_PREPEND(msg_data->inflight, msg);
 		}else{
 			DL_APPEND(msg_data->inflight, msg);
 		}

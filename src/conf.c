@@ -246,6 +246,8 @@ void config__init(struct mosquitto_db *db, struct mosquitto__config *config)
 	config->default_listener.security_options.allow_zero_length_clientid = true;
 	config->default_listener.maximum_qos = 2;
 	config->default_listener.max_topic_alias = 10;
+
+	config->priority_topic_count = 0;
 }
 
 void config__cleanup(struct mosquitto__config *config)

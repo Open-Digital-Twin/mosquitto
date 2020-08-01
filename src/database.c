@@ -312,7 +312,7 @@ void db__message_dequeue_first(struct mosquitto_db *db, struct mosquitto *contex
 	msg = msg_data->queued;
 	DL_DELETE(msg_data->queued, msg);
 
-	if(db__is_critical_topic(db, msg->store->topic)){
+	if(msg_data->inflight_quota > 0 && db__is_critical_topic(db, msg->store->topic)){
 		DL_PREPEND(msg_data->inflight, msg);
 	}else{
 		DL_APPEND(msg_data->inflight, msg);
@@ -501,13 +501,13 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 	msg->properties = properties;
 
 	if(state == mosq_ms_queued){
-		if (db__is_critical_topic(db, msg->store->topic)){
+		if(db__is_critical_topic(db, msg->store->topic)){
 			DL_PREPEND(msg_data->queued, msg);
 		}else{
 			DL_APPEND(msg_data->queued, msg);
 		}
 	}else{
-		if (db__is_critical_topic(db, msg->store->topic)){
+		if(msg_data->inflight_quota > 0 && db__is_critical_topic(db, msg->store->topic)){
 			DL_PREPEND(msg_data->inflight, msg);
 		}else{
 			DL_APPEND(msg_data->inflight, msg);
@@ -1190,12 +1190,19 @@ void db__limits_set(unsigned long inflight_bytes, int queued, unsigned long queu
 
 int db__is_critical_topic(struct mosquitto_db *db, char* topic)
 {
-	for (size_t i = 0; i < db->config->priority_topic_count; i++)
-	{
-		if (strcmp(topic, db->config->priority_topics[i]) == 0)
+	if (strlen(topic) > 0 && db->config->priority_topics > 0) {
+		for (size_t i = 0; i < db->config->priority_topic_count; i++)
 		{
-			return 1;
+			printf("%s / %s\n", topic, db->config->priority_topics[i]);
+			if (strcmp(topic, db->config->priority_topics[i]) == 0)
+			{
+				printf("TRUE\n");
+				return 1;
+			}
 		}
+		printf("FALSE\n");
+		return 0;
 	}
+	printf("FALSE, undefined\n");
 	return 0;
 }

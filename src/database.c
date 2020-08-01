@@ -1193,16 +1193,12 @@ int db__is_critical_topic(struct mosquitto_db *db, char* topic)
 	if (strlen(topic) > 0 && db->config->priority_topics > 0) {
 		for (size_t i = 0; i < db->config->priority_topic_count; i++)
 		{
-			printf("%s / %s\n", topic, db->config->priority_topics[i]);
 			if (strcmp(topic, db->config->priority_topics[i]) == 0)
 			{
-				printf("TRUE\n");
 				return 1;
 			}
 		}
-		printf("FALSE\n");
 		return 0;
 	}
-	printf("FALSE, undefined\n");
 	return 0;
 }

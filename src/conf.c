@@ -345,6 +345,13 @@ void config__cleanup(struct mosquitto__config *config)
 #endif
 	config__cleanup_plugins(config);
 
+	if(config->priority_topic_count > 0){
+		for (size_t i = config->priority_topic_count - 1; i >= 0; i++)
+		{
+			mosquitto__free(config->priority_topics[i]);
+		}
+	}
+
 	if(config->log_fptr){
 		fclose(config->log_fptr);
 		config->log_fptr = NULL;
